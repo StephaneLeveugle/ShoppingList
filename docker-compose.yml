@@ -1,0 +1,29 @@
+version: '2'
+
+services:
+    php:
+        build: php
+        ports:
+            - "80:80"
+            - "443:443"
+            - "9000:9000"
+        volumes:
+            - ./php/app:/app
+        env_file:
+            - php.env
+        environment:
+            - XDEBUG_CONFIG="remote_host=192.168.1.18"
+        links:
+            - db
+    db:
+        image: postgres:latest
+        restart: always
+        volumes:
+            - /var/lib/postgresql/data
+            - ./db/postgresql.conf:/var/lib/postgresql/data/postgresql.conf
+        ports:
+            - "5432:5432"
+        environment:
+            - POSTGRES_PASSWORD=password
+            - POSTGRES_USER=admin
+            - POSTGRES_DB=shoppinglist
