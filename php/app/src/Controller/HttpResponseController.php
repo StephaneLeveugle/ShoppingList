@@ -39,4 +39,9 @@ class HttpResponseController extends AbstractController
     {
         return new JsonResponse(null, $status);
     }
+
+    public function accessDeniedJsonResponse(int $status = 403) : JsonResponse
+    {
+        return $this->error('Access Denied', $status);
+    }
 }

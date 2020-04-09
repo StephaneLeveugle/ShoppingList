@@ -60,6 +60,10 @@ final class ShoppingListController extends HttpResponseController
             return $this->badParameterError('Invalid input JSON');
         }
 
+        if (!$list->getOwners()->contains($this->getUser())) {
+            return $this->accessDeniedJsonResponse(); 
+        }
+
         $items = [];
 
         foreach ($inputItems as $inputItem) {
@@ -90,6 +94,10 @@ final class ShoppingListController extends HttpResponseController
      */
     public function getItems(ShoppingList $list) : JsonResponse
     {
+        if (!$list->getOwners()->contains($this->getUser())) {
+            return $this->accessDeniedJsonResponse(); 
+        }
+
         return $this->json($list->getItems(), 200, [], [
             'groups' => 'NoChildren'
         ]);
@@ -101,6 +109,10 @@ final class ShoppingListController extends HttpResponseController
      */
     public function addOwner(ShoppingList $list, User $user) : JsonResponse
     {
+        if (!$list->getOwners()->contains($this->getUser())) {
+            return $this->accessDeniedJsonResponse(); 
+        }
+
         $list->addOwner($user);
         $entityManager = $this->getDoctrine()->getManager();
         $entityManager->persist($list);
