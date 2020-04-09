@@ -33,7 +33,7 @@ final class ShoppingList
     private Collection $owners;
 
     /**
-     * @ORM\OneToMany(targetEntity="App\Entity\Item", mappedBy="list", orphanRemoval=true)
+     * @ORM\OneToMany(targetEntity="App\Entity\Item", mappedBy="list", orphanRemoval=true, indexBy="id")
      */
     private Collection $items;
 

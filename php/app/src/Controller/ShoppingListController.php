@@ -54,14 +54,14 @@ final class ShoppingListController extends HttpResponseController
      */
     public function addItems(ShoppingList $list, Request $request) : JsonResponse
     {
+        if (!$list->getOwners()->contains($this->getUser())) {
+            return $this->accessDeniedJsonResponse(); 
+        }
+
         $inputItems = json_decode($request->getContent());
 
         if ($inputItems === null) {
             return $this->badParameterError('Invalid input JSON');
-        }
-
-        if (!$list->getOwners()->contains($this->getUser())) {
-            return $this->accessDeniedJsonResponse(); 
         }
 
         $items = [];
@@ -87,6 +87,39 @@ final class ShoppingListController extends HttpResponseController
         $entityManager->flush();
 
         return $this->emptyJsonResponse(201);
+    }
+
+    /**
+     * @Route("/list/{list}/items", name="delete_items", methods={"DELETE"})
+     */
+    public function deleteItems(ShoppingList $list, Request $request) : JsonResponse
+    {
+        if (!$list->getOwners()->contains($this->getUser())) {
+            return $this->accessDeniedJsonResponse(); 
+        }
+
+        $input = json_decode($request->getContent());
+
+        if ($input === null) {
+            return $this->badParameterError('Invalid input JSON');
+        }
+
+        if (!is_array($input) || empty($input)) {
+            return $this->badParameterError('Expected a non empty array of item ids');
+        }
+
+        foreach ($input as $itemId) {
+            if (!is_integer($itemId) || $itemId < 0) {
+                return $this->badParameterError('The item ids must be postive integers');
+            }
+            $list->getItems()->remove($itemId);
+        }
+
+        $entityManager = $this->getDoctrine()->getManager();
+        $entityManager->persist($list);
+        $entityManager->flush();
+
+        return $this->emptyJsonResponse();
     }
 
     /**
