@@ -110,12 +110,64 @@ final class ShoppingListController extends HttpResponseController
 
         foreach ($input as $itemId) {
             if (!is_integer($itemId) || $itemId < 0) {
-                return $this->badParameterError('The item ids must be postive integers');
+                return $this->badParameterError('The item ids must be positive integers');
             }
             $list->getItems()->remove($itemId);
         }
 
         $entityManager = $this->getDoctrine()->getManager();
+        $entityManager->persist($list);
+        $entityManager->flush();
+
+        return $this->emptyJsonResponse();
+    }
+
+    /**
+     * @Route("/list/{list}/items", name="update_items", methods={"PATCH"})
+     */
+    public function updateItems(ShoppingList $list, Request $request) : JsonResponse
+    {
+        if (!$list->getOwners()->contains($this->getUser())) {
+            return $this->accessDeniedJsonResponse(); 
+        }
+
+        $input = json_decode($request->getContent());
+
+        if ($input === null) {
+            return $this->badParameterError('Invalid input JSON');
+        }
+
+        if (!is_array($input) || empty($input)) {
+            return $this->badParameterError('Expected a non empty array of item ids');
+        }
+
+        $entityManager = $this->getDoctrine()->getManager();
+
+        $listItems = $list->getItems();
+        foreach ($input as $inputItem) {
+            if (!property_exists($inputItem, 'id')) {
+                return $this->badParameterError('Missing "id" property');
+            }
+            $item = $listItems->get($inputItem->id);
+            if ($item === null) {
+                return $this->badParameterError("Invalid \"id\" property: {$inputItem->id}");
+            } 
+            if (property_exists($inputItem, 'name')) {
+                if (!is_string($inputItem->name) || !strlen($inputItem->name)) {
+                    return $this->badParameterError('Empty or non string value for the "name" property');
+                }
+                $item->setName($inputItem->name);
+            }
+            if (property_exists($inputItem, 'checked')) {
+                if (!is_bool($inputItem->checked)) {
+                    return $this->badParameterError('Missing, empty or non string value for the "checked" property');
+                }
+                $item->setChecked($inputItem->checked);
+            }
+
+            $entityManager->persist($item);
+        }
+
         $entityManager->persist($list);
         $entityManager->flush();
 
@@ -131,7 +183,7 @@ final class ShoppingListController extends HttpResponseController
             return $this->accessDeniedJsonResponse(); 
         }
 
-        return $this->json($list->getItems(), 200, [], [
+        return $this->json($list->getItems()->getValues(), 200, [], [
             'groups' => 'NoChildren'
         ]);
     }
