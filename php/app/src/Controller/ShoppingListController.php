@@ -6,6 +6,8 @@ use App\Controller\HttpResponseController;
 use App\Entity\Item;
 use App\Entity\ShoppingList;
 use App\Entity\User;
+use App\Validator\AddItemInputValidator;
+use App\Validator\UpdateItemInputValidator;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\ParamConverter;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -22,7 +24,7 @@ final class ShoppingListController extends HttpResponseController
     /**
      * @Route("/list", name="add_list", methods={"POST"})
      */
-    public function addList(Request $request, ValidatorInterface $validator) : JsonResponse
+    public function addList(Request $request, ValidatorInterface $validator, SerializerInterface $serializer) : JsonResponse
     {
         $input = json_decode($request->getContent());
 
@@ -46,19 +48,21 @@ final class ShoppingListController extends HttpResponseController
         $entityManager->persist($list);
         $entityManager->flush();
 
-        return $this->emptyJsonResponse(201);
+        return $this->json($list, 200, [], [
+            'groups' => 'NoChildren'
+        ]);
     }
 
     /**
      * @Route("/list/{list}/items", name="add_items", methods={"POST"})
      */
-    public function addItems(ShoppingList $list, Request $request) : JsonResponse
+    public function addItems(ShoppingList $list, Request $request, ValidatorInterface $validator) : JsonResponse
     {
         if (!$list->getOwners()->contains($this->getUser())) {
             return $this->accessDeniedJsonResponse(); 
         }
 
-        $inputItems = json_decode($request->getContent());
+        $inputItems = json_decode($request->getContent(), true);
 
         if ($inputItems === null) {
             return $this->badParameterError('Invalid input JSON');
@@ -67,14 +71,11 @@ final class ShoppingListController extends HttpResponseController
         $items = [];
 
         foreach ($inputItems as $inputItem) {
-            if (!property_exists($inputItem, 'name') || !is_string($inputItem->name) || !strlen($inputItem->name)) {
-                return $this->badParameterError('Missing, empty or non string value for the "name" property');
+            $errors = $validator->validate(new AddItemInputValidator($inputItem));
+            if ($errors->count()) {
+                return $this->handleValidationErrors($errors);
             }
-            if (!property_exists($inputItem, 'checked') || !is_bool($inputItem->checked)) {
-                return $this->badParameterError('Missing, empty or non string value for the "checked" property');
-            }
-
-            $items[] = new Item($inputItem->name, $list, $inputItem->checked);
+            $items[] = new Item($inputItem['name'], $list, $inputItem['checked']);
         }
 
         $entityManager = $this->getDoctrine()->getManager();
@@ -86,7 +87,9 @@ final class ShoppingListController extends HttpResponseController
         $entityManager->persist($list);
         $entityManager->flush();
 
-        return $this->emptyJsonResponse(201);
+        return $this->json($items, 200, [], [
+            'groups' => 'NoChildren'
+        ]);
     }
 
     /**
@@ -125,13 +128,13 @@ final class ShoppingListController extends HttpResponseController
     /**
      * @Route("/list/{list}/items", name="update_items", methods={"PATCH"})
      */
-    public function updateItems(ShoppingList $list, Request $request) : JsonResponse
+    public function updateItems(ShoppingList $list, Request $request, ValidatorInterface $validator) : JsonResponse
     {
         if (!$list->getOwners()->contains($this->getUser())) {
             return $this->accessDeniedJsonResponse(); 
         }
 
-        $input = json_decode($request->getContent());
+        $input = json_decode($request->getContent(), true);
 
         if ($input === null) {
             return $this->badParameterError('Invalid input JSON');
@@ -144,34 +147,33 @@ final class ShoppingListController extends HttpResponseController
         $entityManager = $this->getDoctrine()->getManager();
 
         $listItems = $list->getItems();
+        $itemsUpdated = [];
         foreach ($input as $inputItem) {
-            if (!property_exists($inputItem, 'id')) {
-                return $this->badParameterError('Missing "id" property');
+            $errors = $validator->validate(new UpdatesItemInputValidator($inputItem));
+            if ($errors->count()) {
+                return $this->handleValidationErrors($errors);
             }
-            $item = $listItems->get($inputItem->id);
+            $item = $listItems->get($inputItem['id']);
             if ($item === null) {
-                return $this->badParameterError("Invalid \"id\" property: {$inputItem->id}");
+                return $this->badParameterError("Invalid \"id\" property: {$inputItem['id']}");
             } 
-            if (property_exists($inputItem, 'name')) {
-                if (!is_string($inputItem->name) || !strlen($inputItem->name)) {
-                    return $this->badParameterError('Empty or non string value for the "name" property');
-                }
-                $item->setName($inputItem->name);
+            if (array_key_exists('name', $inputItem)) {
+                $item->setName($inputItem['name']);
             }
-            if (property_exists($inputItem, 'checked')) {
-                if (!is_bool($inputItem->checked)) {
-                    return $this->badParameterError('Missing, empty or non string value for the "checked" property');
-                }
-                $item->setChecked($inputItem->checked);
+            if (array_key_exists('checked', $inputItem)) {
+                $item->setChecked($inputItem['checked']);
             }
 
             $entityManager->persist($item);
+            $itemsUpdated[] = $item;
         }
 
         $entityManager->persist($list);
         $entityManager->flush();
 
-        return $this->emptyJsonResponse();
+        return $this->json($itemsUpdated, 200, [], [
+            'groups' => 'NoChildren'
+        ]);
     }
 
     /**
@@ -202,6 +204,9 @@ final class ShoppingListController extends HttpResponseController
         $entityManager = $this->getDoctrine()->getManager();
         $entityManager->persist($list);
         $entityManager->flush();
-        return $this->emptyJsonResponse();
+
+        return $this->json($list->getOwners()->getValues(), 200, [], [
+            'groups' => 'NoChildren'
+        ]);
     }
 }

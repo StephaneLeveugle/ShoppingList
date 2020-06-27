@@ -19,7 +19,7 @@ services:
         image: postgres:latest
         restart: always
         volumes:
-            - /var/lib/postgresql/data
+            - /var/lib/postgresql/data/db-files
             - ./db/postgresql.conf:/var/lib/postgresql/data/postgresql.conf
         ports:
             - "5432:5432"
@@ -27,3 +27,4 @@ services:
             - POSTGRES_PASSWORD=password
             - POSTGRES_USER=admin
             - POSTGRES_DB=shoppinglist
+            - PGDATA=/var/lib/postgresql/data/db-files
